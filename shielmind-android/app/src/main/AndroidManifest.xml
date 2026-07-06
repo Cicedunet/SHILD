@@ -59,6 +59,14 @@
              3. Tant que l'app est "Device Admin Active", Android
                 refuse sa désinstallation depuis les paramètres
              ════════════════════════════════════════════════════════ -->
+        <service
+            android:name=".service.ShieldFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".admin.ShieldDeviceAdminReceiver"
             android:label="ShieldMind Admin"
