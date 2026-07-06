@@ -1,4 +1,4 @@
-package com.shielmind.ai
+package com.example.shielmind.ai
 
 import android.content.Context
 
