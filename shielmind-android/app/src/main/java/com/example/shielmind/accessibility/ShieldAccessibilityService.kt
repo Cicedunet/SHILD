@@ -1,19 +1,10 @@
 package com.example.shielmind.accessibility
 
-// ════════════════════════════════════════════════════════
-// REMPLACE le fichier existant :
-// app/src/main/java/com/example/shielmind/accessibility/ShieldAccessibilityService.kt
-//
-// Changements par rapport à la version du Jour 1 :
-// 1. Filtrage du bruit UI (TextNoiseFilter)
-// 2. Déduplication / throttling (CaptureThrottler)
-// 3. Construction d'un CapturedContent propre en sortie
-// ════════════════════════════════════════════════════════
-
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.example.shielmind.ai.TFLiteClassifier
 
 class ShieldAccessibilityService : AccessibilityService() {
 
@@ -21,10 +12,8 @@ class ShieldAccessibilityService : AccessibilityService() {
         private const val TAG = "ShieldMind_Service"
     }
 
-    // Une seule instance de throttler pour toute la durée de vie du service.
-    // Si on en créait une nouvelle à chaque événement, la déduplication
-    // ne fonctionnerait jamais (elle "oublierait" le texte précédent).
     private val throttler = CaptureThrottler()
+    private lateinit var classifier: TFLiteClassifier
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -32,41 +21,19 @@ class ShieldAccessibilityService : AccessibilityService() {
         val packageName = event.packageName?.toString() ?: "inconnu"
         val rootNode: AccessibilityNodeInfo? = event.source
 
-        if (rootNode == null) {
-            // On ne log même plus ce cas en détail (Jour 1 l'a déjà validé,
-            // c'est un comportement normal et fréquent d'Android)
-            return
-        }
+        if (rootNode == null) return
 
-        // ─────────────────────────────────────────
-        // ÉTAPE 1 : Extraction brute (logique du Jour 1, inchangée)
-        // ─────────────────────────────────────────
         val rawText = extractAllText(rootNode)
         rootNode.recycle()
 
         if (rawText.isBlank()) return
 
-        // ─────────────────────────────────────────
-        // ÉTAPE 2 : Nettoyage du bruit UI (NOUVEAU - Jour 2)
-        // ─────────────────────────────────────────
         val cleanedText = TextNoiseFilter.clean(rawText)
 
-        if (!TextNoiseFilter.isWorthAnalyzing(cleanedText)) {
-            // Texte vide ou sans intérêt après nettoyage (ex: juste "160 160")
-            return
-        }
+        if (!TextNoiseFilter.isWorthAnalyzing(cleanedText)) return
 
-        // ─────────────────────────────────────────
-        // ÉTAPE 3 : Déduplication / throttling (NOUVEAU - Jour 2)
-        // ─────────────────────────────────────────
-        if (!throttler.shouldAnalyze(cleanedText)) {
-            // Soit texte déjà vu, soit trop tôt depuis la dernière analyse
-            return
-        }
+        if (!throttler.shouldAnalyze(cleanedText)) return
 
-        // ─────────────────────────────────────────
-        // ÉTAPE 4 : Construction de l'objet propre (NOUVEAU - Jour 2)
-        // ─────────────────────────────────────────
         val content = CapturedContent.create(
             text = cleanedText,
             sourceApp = packageName
@@ -76,22 +43,38 @@ class ShieldAccessibilityService : AccessibilityService() {
                 "${content.characterCount} caractères, " +
                 "texte=\"${content.text.take(100)}...\"")
 
-        // ──────────────────────────────────────────────
-        // POINT D'INTÉGRATION FUTUR :
-        // C'est ICI qu'on appellera le modèle TFLite de Membre 1 :
-        //
-        //   val score = ModeleShieldMind.predict(content.text)
-        //   val decision = MoteurDecision.evaluer(score, ageEnfant)
-        //   val result = AnalysisResult(content, score, decision)
-        //
-        // En attendant que son modèle soit intégré, on se contente
-        // de logger le contenu propre et structuré.
-        // ──────────────────────────────────────────────
+        // ANALYSE IA (TFLite)
+        val toxicityScore = classifier.classify(content.text)
+        Log.d(TAG, "Score de toxicité détecté : $toxicityScore")
+
+        if (toxicityScore > 0.8f) { // Seuil de blocage
+            Log.w(TAG, "CONTENU TOXIQUE DÉTECTÉ ! Blocage en cours...")
+            showBlockingUI(content.text)
+            sendAlertToParent(content)
+        }
     }
 
-    /**
-     * Inchangé depuis le Jour 1 — fonctionne déjà très bien d'après tes tests.
-     */
+    private fun showBlockingUI(reason: String) {
+        val intent = android.content.Intent(this, com.example.shielmind.MainActivity::class.java).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra("BLOCK_REASON", reason)
+        }
+        startActivity(intent)
+    }
+
+    private fun sendAlertToParent(content: CapturedContent) {
+        val currentChildId = "child_user_123"
+        val linkedParentId = "parent_user_456"
+
+        com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
+            childId = currentChildId,
+            parentId = linkedParentId,
+            contentText = content.text,
+            sourceApp = content.sourceApp
+        )
+        Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent.")
+    }
+
     private fun extractAllText(node: AccessibilityNodeInfo): String {
         val builder = StringBuilder()
 
@@ -125,5 +108,6 @@ class ShieldAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "ShieldMind Accessibility Service démarré avec succès")
+        classifier = TFLiteClassifier(this)
     }
 }
