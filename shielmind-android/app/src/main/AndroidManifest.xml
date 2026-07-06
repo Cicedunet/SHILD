@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AndroidManifest.xml MIS À JOUR avec Device Administrator
+    Remplace : app/src/main/AndroidManifest.xml
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ShielMind">
+
+        <!-- ════════════════════════════════════════════════════════
+             ACTIVITÉ PRINCIPALE
+             ════════════════════════════════════════════════════════ -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.ShielMind">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ════════════════════════════════════════════════════════
+             SERVICE D'ACCESSIBILITÉ (déjà présent dans votre projet)
+             Analyse les textes affichés à l'écran via AccessibilityService
+             ════════════════════════════════════════════════════════ -->
+        <service
+            android:name=".accessibility.ShieldAccessibilityService"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ════════════════════════════════════════════════════════
+             ✅ NOUVEAU : DEVICE ADMINISTRATOR RECEIVER
+             Empêche la désinstallation non autorisée de l'app.
+
+             FONCTIONNEMENT :
+             1. On déclare ShieldDeviceAdminReceiver comme receiver
+                avec la permission BIND_DEVICE_ADMIN
+             2. On pointe vers device_admin_receiver.xml qui liste
+                les politiques demandées
+             3. Tant que l'app est "Device Admin Active", Android
+                refuse sa désinstallation depuis les paramètres
+             ════════════════════════════════════════════════════════ -->
+        <receiver
+            android:name=".admin.ShieldDeviceAdminReceiver"
+            android:label="ShieldMind Admin"
+            android:description="@string/device_admin_description"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+
+            <!-- Intent-filter obligatoire pour être reconnu comme Device Admin -->
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+
+            <!-- Fichier XML qui déclare les politiques utilisées -->
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+        </receiver>
+
+    </application>
+
+</manifest>

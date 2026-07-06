@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FICHIER : app/src/main/res/xml/device_admin_receiver.xml
+    RÔLE    : Déclare les politiques que ShieldMind peut appliquer
+              en tant qu'Administrateur de l'appareil.
+    USAGE   : Référencé dans le AndroidManifest.xml via meta-data.
+-->
+<device-admin>
+    <uses-policies>
+        <!--
+            Permet d'empêcher la désinstallation non autorisée.
+            Tant que l'app est administrateur, Android interdit
+            sa suppression depuis les paramètres système.
+        -->
+        <force-lock />
+        <wipe-data />
+    </uses-policies>
+</device-admin>
