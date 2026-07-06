@@ -55,11 +55,15 @@ class ShieldAccessibilityService : AccessibilityService() {
     }
 
     private fun showBlockingUI(reason: String) {
+        // Envoi d'un broadcast ou démarrage d'activité pour bloquer
+        // Pour une fiabilité maximale en arrière-plan, on utilise FLAG_ACTIVITY_CLEAR_TOP
         val intent = android.content.Intent(this, com.example.shielmind.MainActivity::class.java).apply {
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("BLOCK_REASON", reason)
         }
         startActivity(intent)
+        Log.i(TAG, "Écran de blocage activé pour l'application en cours.")
     }
 
     private fun sendAlertToParent(content: CapturedContent) {

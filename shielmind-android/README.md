@@ -5,13 +5,11 @@ ShieldMind est une application Android de contrôle parental conçue pour proté
 ## Fonctionnalités Implémentées
 
 1.  **Analyse en Temps Réel** : Utilise un `AccessibilityService` pour capturer le texte affiché à l'écran dans n'importe quelle application (WhatsApp, Chrome, TikTok, etc.).
-2.  **Intelligence Artificielle Embarquée** : Intégration de TensorFlow Lite avec le modèle `shieldmindv2.tflite` pour classifier la toxicité du texte localement, sans consommer de données mobiles.
-3.  **Blocage Éducatif** : Affiche un écran de blocage immédiat lorsqu'un contenu toxique est détecté, expliquant la raison à l'adolescent.
-4.  **Synchronisation Parent-Enfant (Firebase)** :
-    *   Les alertes sont envoyées instantanément sur Firestore.
-    *   L'application écoute les décisions du parent à distance (Approuver/Bloquer).
-    *   Liaison multi-enfants : Un parent peut superviser plusieurs comptes enfants.
-5.  **Sécurité** : Authentification biométrique pour le tableau de bord parent et protection anti-désinstallation (Device Admin).
+2.  **Intelligence Artificielle Embarquée** : Intégration de TensorFlow Lite avec le modèle `shieldmindv2.tflite` pour classifier la toxicité du texte localement.
+3.  **Interface Moderne & Animée** : Design épuré en Material 3 avec des animations fluides pour une expérience utilisateur moderne.
+4.  **Tableau de Bord Parent Complet** : Suivi des alertes en temps réel, statistiques et gestion à distance des décisions de blocage.
+5.  **Liaison Parent-Enfant Sécurisée** : Système d'authentification Firebase avec couplage par identifiant unique pour lier un parent à plusieurs enfants.
+6.  **Sécurité Avancée** : Authentification biométrique pour les parents et protection contre la désinstallation via les privilèges d'administrateur système.
 
 ## Comment Exécuter le Projet
 
