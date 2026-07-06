@@ -63,6 +63,18 @@ fun ServiceSetupScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
+                text = "ID de jumelage : CHILD_8842",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
                 text = "Protégez votre enfant en 2 étapes",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.Gray,

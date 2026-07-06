@@ -15,33 +15,45 @@ import com.example.shielmind.ui.screens.*
 import com.example.shielmind.ui.theme.ShielMindTheme
 
 class MainActivity : ComponentActivity() {
+
+    private var blockReasonState = mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        blockReasonState.value = intent?.getStringExtra("BLOCK_REASON")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val blockReason = intent.getStringExtra("BLOCK_REASON")
+        blockReasonState.value = intent.getStringExtra("BLOCK_REASON")
 
         enableEdgeToEdge()
         setContent {
             ShielMindTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    var currentScreen by remember { mutableStateOf(if (blockReason != null) "block" else "auth") }
+                    val blockReason by blockReasonState
+                    var currentScreen by remember { mutableStateOf("auth") }
                     var isParentRole by remember { mutableStateOf(false) }
 
-                    when (currentScreen) {
-                        "auth" -> AuthScreen(onAuthSuccess = { isParent ->
-                            isParentRole = isParent
-                            currentScreen = if (isParent) "pairing" else "setup"
-                        })
-                        "pairing" -> PairingScreen(onPairingComplete = {
-                            currentScreen = "dashboard"
-                        })
-                        "setup" -> ServiceSetupScreen()
-                        "dashboard" -> ParentDashboardScreen()
-                        "block" -> EducationalBlockScreen(
+                    if (blockReason != null) {
+                        EducationalBlockScreen(
                             onUnblockRequest = {
                                 Toast.makeText(this@MainActivity, "Demande envoyée au parent", Toast.LENGTH_SHORT).show()
                             }
                         )
+                    } else {
+                        when (currentScreen) {
+                            "auth" -> AuthScreen(onAuthSuccess = { isParent ->
+                                isParentRole = isParent
+                                currentScreen = if (isParent) "pairing" else "setup"
+                            })
+                            "pairing" -> PairingScreen(onPairingComplete = {
+                                currentScreen = "dashboard"
+                            })
+                            "setup" -> ServiceSetupScreen()
+                            "dashboard" -> ParentDashboardScreen()
+                        }
                     }
                 }
             }

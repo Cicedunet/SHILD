@@ -45,7 +45,8 @@ class TFLiteClassifier(context: Context) {
             // interpreter?.run(input, output)
             // Pour l'instant, on fait une détection basique de mots clés si le modèle n'est pas chargé proprement
             // ou on renvoie une valeur simulée basée sur le texte pour la démo
-            if (text.contains("insulte", ignoreCase = true) || text.contains("violence", ignoreCase = true)) {
+            val toxicKeywords = listOf("insulte", "violence", "haine", "drogue", "tuer", "mort")
+            if (toxicKeywords.any { text.contains(it, ignoreCase = true) }) {
                 return 0.9f
             }
         } catch (e: Exception) {
