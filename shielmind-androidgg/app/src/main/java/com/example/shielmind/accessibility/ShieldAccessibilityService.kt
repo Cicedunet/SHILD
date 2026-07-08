@@ -67,16 +67,26 @@ class ShieldAccessibilityService : AccessibilityService() {
     }
 
     private fun sendAlertToParent(content: CapturedContent) {
-        val currentChildId = "child_user_123"
-        val linkedParentId = "parent_user_456"
+        val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        val currentChildId = auth.currentUser?.uid ?: "anonymous_child"
 
-        com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
-            childId = currentChildId,
-            parentId = linkedParentId,
-            contentText = content.text,
-            sourceApp = content.sourceApp
-        )
-        Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent.")
+        // On cherche le parent lié dans Firestore
+        db.collection("links").document(currentChildId).get()
+            .addOnSuccessListener { doc ->
+                val parentId = doc.getString("parentId")
+                if (parentId != null) {
+                    com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
+                        childId = currentChildId,
+                        parentId = parentId,
+                        contentText = content.text,
+                        sourceApp = content.sourceApp
+                    )
+                    Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent : $parentId")
+                } else {
+                    Log.w(TAG, "Aucun parent lié trouvé pour cet enfant.")
+                }
+            }
     }
 
     private fun extractAllText(node: AccessibilityNodeInfo): String {
