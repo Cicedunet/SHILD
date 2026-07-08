@@ -13,6 +13,8 @@ import com.example.shielmind.service.FirebaseSyncManager
 import com.example.shielmind.ui.ServiceSetupScreen
 import com.example.shielmind.ui.screens.*
 import com.example.shielmind.ui.theme.ShielMindTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : ComponentActivity() {
 
@@ -27,14 +29,27 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         blockReasonState.value = intent.getStringExtra("BLOCK_REASON")
+        val auth = FirebaseAuth.getInstance()
+        val db = FirebaseFirestore.getInstance()
 
         enableEdgeToEdge()
         setContent {
             ShielMindTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val blockReason by blockReasonState
-                    var currentScreen by remember { mutableStateOf("auth") }
-                    var isParentRole by remember { mutableStateOf(false) }
+                    var currentScreen by remember { mutableStateOf(if (auth.currentUser == null) "auth" else "loading") }
+                    var userRole by remember { mutableStateOf<String?>(null) }
+
+                    // Fetch user role if already logged in
+                    LaunchedEffect(Unit) {
+                        if (auth.currentUser != null) {
+                            db.collection("users").document(auth.currentUser!!.uid).get()
+                                .addOnSuccessListener { doc ->
+                                    userRole = doc.getString("role")
+                                    currentScreen = if (userRole == "parent") "dashboard" else "setup"
+                                }
+                        }
+                    }
 
                     if (blockReason != null) {
                         EducationalBlockScreen(
@@ -45,7 +60,6 @@ class MainActivity : ComponentActivity() {
                     } else {
                         when (currentScreen) {
                             "auth" -> AuthScreen(onAuthSuccess = { isParent ->
-                                isParentRole = isParent
                                 currentScreen = if (isParent) "pairing" else "setup"
                             })
                             "pairing" -> PairingScreen(onPairingComplete = {
@@ -53,16 +67,22 @@ class MainActivity : ComponentActivity() {
                             })
                             "setup" -> ServiceSetupScreen()
                             "dashboard" -> ParentDashboardScreen()
+                            "loading" -> { /* Simple loader */ }
                         }
                     }
                 }
             }
         }
 
-        // Écoute des décisions parentales à distance
-        FirebaseSyncManager.listenForParentDecision("child_user_123") { approvedText ->
-            Toast.makeText(this, "Parent a autorisé : $approvedText", Toast.LENGTH_LONG).show()
-            finish()
+        // Écoute des décisions parentales à distance si c'est un enfant
+        auth.addAuthStateListener { firebaseAuth ->
+            val user = firebaseAuth.currentUser
+            if (user != null) {
+                FirebaseSyncManager.listenForParentDecision(user.uid) { approvedText ->
+                    Toast.makeText(this, "Parent a autorisé : $approvedText", Toast.LENGTH_LONG).show()
+                    blockReasonState.value = null
+                }
+            }
         }
     }
 }

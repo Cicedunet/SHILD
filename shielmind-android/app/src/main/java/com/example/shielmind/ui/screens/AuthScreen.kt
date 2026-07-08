@@ -1,23 +1,33 @@
 package com.example.shielmind.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun AuthScreen(
-    onAuthSuccess: (Boolean) -> Unit // Boolean: true if parent, false if child
+    onAuthSuccess: (Boolean) -> Unit
 ) {
+    val context = LocalContext.current
     var isLogin by remember { mutableStateOf(true) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isParent by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
 
     Column(
         modifier = Modifier
@@ -27,11 +37,12 @@ fun AuthScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = if (isLogin) "Connexion" else "Inscription",
+            text = "ShieldMind",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
+        Text(text = if (isLogin) "Connexion" else "Créer un compte", color = Color.Gray)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -51,27 +62,67 @@ fun AuthScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = isParent, onClick = { isParent = true })
-            Text("Parent")
-            Spacer(modifier = Modifier.width(16.dp))
-            RadioButton(selected = !isParent, onClick = { isParent = false })
-            Text("Enfant")
+        if (!isLogin) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = isParent, onClick = { isParent = true })
+                Text("Parent")
+                Spacer(modifier = Modifier.width(16.dp))
+                RadioButton(selected = !isParent, onClick = { isParent = false })
+                Text("Enfant")
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = { onAuthSuccess(isParent) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (isLogin) "Se connecter" else "S'inscrire")
-        }
+        if (isLoading) {
+            CircularProgressIndicator()
+        } else {
+            Button(
+                onClick = {
+                    if (email.isBlank() || password.isBlank()) return@Button
+                    isLoading = true
+                    if (isLogin) {
+                        auth.signInWithEmailAndPassword(email, password)
+                            .addOnSuccessListener { result ->
+                                // Fetch role from Firestore
+                                db.collection("users").document(result.user!!.uid).get()
+                                    .addOnSuccessListener { doc ->
+                                        val role = doc.getString("role") ?: "parent"
+                                        onAuthSuccess(role == "parent")
+                                    }
+                            }
+                            .addOnFailureListener {
+                                isLoading = false
+                                Toast.makeText(context, "Erreur: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                    } else {
+                        auth.createUserWithEmailAndPassword(email, password)
+                            .addOnSuccessListener { result ->
+                                val user = hashMapOf(
+                                    "email" to email,
+                                    "role" to if (isParent) "parent" else "enfant",
+                                    "uid" to result.user!!.uid
+                                )
+                                db.collection("users").document(result.user!!.uid).set(user)
+                                    .addOnSuccessListener {
+                                        onAuthSuccess(isParent)
+                                    }
+                            }
+                            .addOnFailureListener {
+                                isLoading = false
+                                Toast.makeText(context, "Erreur: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isLogin) "Se connecter" else "S'inscrire")
+            }
 
-        TextButton(onClick = { isLogin = !isLogin }) {
-            Text(if (isLogin) "Pas encore de compte ? S'inscrire" else "Déjà un compte ? Se connecter")
+            TextButton(onClick = { isLogin = !isLogin }) {
+                Text(if (isLogin) "Pas encore de compte ? S'inscrire" else "Déjà un compte ? Se connecter")
+            }
         }
     }
 }
