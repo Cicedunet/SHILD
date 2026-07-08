@@ -41,41 +41,36 @@ class TFLiteClassifier(context: Context) {
     fun classify(text: String): Float {
         if (interpreter == null || text.isBlank()) return 0f
 
-        // 1. Préparation de l'entrée (Type INT32 selon l'erreur Logcat)
+        // 0. Fallback Mots-clés Prioritaires (Détection immédiate pour contenus ultra-toxiques)
+        val priorityKeywords = listOf("porno", "porn", "sex", "1xbet", "megapari", "insulte", "haine", "violence")
+        if (priorityKeywords.any { text.contains(it, ignoreCase = true) }) {
+            Log.d("TFLiteClassifier", "Toxicité détectée via mots-clés prioritaires.")
+            return 0.98f
+        }
+
+        // 1. Préparation de l'entrée (Type INT32 attendu par le modèle shieldmindv2.tflite)
         val input = Array(1) { IntArray(inputSequenceLength) }
         val tokens = tokenize(text)
 
         for (i in 0 until inputSequenceLength) {
-            if (i < tokens.size) {
-                input[0][i] = tokens[i]
-            } else {
-                input[0][i] = 0 // Padding
-            }
+            input[0][i] = if (i < tokens.size) tokens[i] else 0 // Padding avec 0
         }
 
-        // 2. Préparation de la sortie (Probabilité FLOAT32)
+        // 2. Préparation de la sortie (Probabilité FLOAT32 entre 0 et 1)
         val output = Array(1) { FloatArray(1) }
 
         try {
             // 3. Exécution de l'inférence
             interpreter?.run(input, output)
             val score = output[0][0]
-            Log.d("TFLiteClassifier", "Score d'inférence pour \"${text.take(20)}...\" : $score")
-
-            // 4. Sécurité supplémentaire (mots-clés critiques)
-            if (score < 0.8f) {
-                val emergencyKeywords = listOf("porno", "porn", "sex", "1xbet", "megapari")
-                if (emergencyKeywords.any { text.contains(it, ignoreCase = true) }) {
-                    return 0.95f
-                }
-            }
+            Log.d("TFLiteClassifier", "Score d'inférence IA pour \"${text.take(20)}...\" : $score")
 
             return score
         } catch (e: Exception) {
             Log.e("TFLiteClassifier", "Erreur lors de l'inférence : ${e.message}")
+            // En cas d'erreur de l'IA, on se base sur une détection par mots-clés simplifiée par sécurité
+            return if (priorityKeywords.any { text.contains(it, ignoreCase = true) }) 0.95f else 0.1f
         }
-
-        return 0.1f
     }
 
     /**
