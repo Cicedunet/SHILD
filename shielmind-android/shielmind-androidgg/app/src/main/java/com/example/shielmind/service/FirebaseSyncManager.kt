@@ -51,6 +51,13 @@ object FirebaseSyncManager {
     }
 
     /**
+     * Enregistre le token FCM de l'appareil.
+     */
+    fun updateFcmToken(userId: String, token: String) {
+        db.collection("users").document(userId).update("fcmToken", token)
+    }
+
+    /**
      * Écoute les changements de décision du parent pour un contenu spécifique.
      */
     fun listenForParentDecision(childId: String, onDecision: (String) -> Unit) {
