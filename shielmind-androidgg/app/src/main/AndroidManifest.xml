@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    AndroidManifest.xml MIS À JOUR avec Device Administrator
+    AndroidManifest.xml MIS À JOUR avec Device Administrator et Application class
     Remplace : app/src/main/AndroidManifest.xml
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
+        android:name=".ShieldMindApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -48,16 +49,7 @@
         </service>
 
         <!-- ════════════════════════════════════════════════════════
-             ✅ NOUVEAU : DEVICE ADMINISTRATOR RECEIVER
-             Empêche la désinstallation non autorisée de l'app.
-
-             FONCTIONNEMENT :
-             1. On déclare ShieldDeviceAdminReceiver comme receiver
-                avec la permission BIND_DEVICE_ADMIN
-             2. On pointe vers device_admin_receiver.xml qui liste
-                les politiques demandées
-             3. Tant que l'app est "Device Admin Active", Android
-                refuse sa désinstallation depuis les paramètres
+             SERVICE DE MESSAGERIE FIREBASE
              ════════════════════════════════════════════════════════ -->
         <service
             android:name=".service.ShieldFirebaseMessagingService"
@@ -67,6 +59,10 @@
             </intent-filter>
         </service>
 
+        <!-- ════════════════════════════════════════════════════════
+             ✅ NOUVEAU : DEVICE ADMINISTRATOR RECEIVER
+             Empêche la désinstallation non autorisée de l'app.
+             ════════════════════════════════════════════════════════ -->
         <receiver
             android:name=".admin.ShieldDeviceAdminReceiver"
             android:label="ShieldMind Admin"
