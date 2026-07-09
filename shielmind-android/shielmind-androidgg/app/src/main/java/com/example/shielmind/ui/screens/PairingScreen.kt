@@ -45,9 +45,10 @@ fun PairingScreen(
 
         OutlinedTextField(
             value = childId,
-            onValueChange = { childId = it },
-            label = { Text("ID Enfant (ex: CHILD_123)") },
-            modifier = Modifier.fillMaxWidth()
+            onValueChange = { childId = it.trim() },
+            label = { Text("ID Enfant (UID)") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Collez l'ID affiché sur le téléphone de l'enfant") }
         )
 
         Spacer(modifier = Modifier.height(32.dp))

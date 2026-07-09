@@ -28,7 +28,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        blockReasonState.value = intent.getStringExtra("BLOCK_REASON")
+        val blockReasonFromIntent = intent.getStringExtra("BLOCK_REASON")
+        if (blockReasonFromIntent != null) {
+            blockReasonState.value = blockReasonFromIntent
+        }
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseFirestore.getInstance()
 
@@ -55,6 +58,7 @@ class MainActivity : ComponentActivity() {
                         EducationalBlockScreen(
                             onUnblockRequest = {
                                 Toast.makeText(this@MainActivity, "Demande envoyée au parent", Toast.LENGTH_SHORT).show()
+                                // Optionnel: on pourrait notifier le parent via Firestore ici aussi
                             }
                         )
                     } else {

@@ -1,5 +1,6 @@
 package com.example.shielmind.ui.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -30,10 +31,20 @@ fun ParentDashboardScreen() {
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
     var alerts by remember { mutableStateOf(listOf<AlertItem>()) }
+    var linkedChildrenCount by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         val parentId = auth.currentUser?.uid ?: return@LaunchedEffect
+
+        // 1. Compter les enfants liés
+        db.collection("links")
+            .whereEqualTo("parentId", parentId)
+            .addSnapshotListener { snapshots, _ ->
+                linkedChildrenCount = snapshots?.size() ?: 0
+            }
+
+        // 2. Écouter les alertes
         db.collection("alerts")
             .whereEqualTo("parentId", parentId)
             .whereEqualTo("status", "blocked")
@@ -41,16 +52,21 @@ fun ParentDashboardScreen() {
             .addSnapshotListener { snapshots, e ->
                 isLoading = false
                 if (e != null) {
-                    Toast.makeText(context, "Erreur flux: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("Dashboard", "Erreur flux alertes: ${e.message}")
                     return@addSnapshotListener
                 }
                 if (snapshots != null) {
                     alerts = snapshots.map { doc ->
+                        val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                        val timeStr = sdf.format(java.util.Date(timestamp))
+
                         AlertItem(
                             id = doc.id,
                             title = doc.getString("text") ?: "Contenu Bloqué",
                             app = doc.getString("app") ?: "Inconnu",
-                            time = "Il y a un instant" // En prod, formater le timestamp
+                            time = timeStr,
+                            childEmail = doc.getString("childEmail") ?: "Enfant"
                         )
                     }
                 }
@@ -77,7 +93,7 @@ fun ParentDashboardScreen() {
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatCard("Alertes Actives", alerts.size.toString(), Color(0xFFD32F2F), modifier = Modifier.weight(1f))
-                StatCard("Enfants Liés", "1", Color(0xFF1976D2), modifier = Modifier.weight(1f))
+                StatCard("Enfants Liés", linkedChildrenCount.toString(), Color(0xFF1976D2), modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -144,7 +160,7 @@ fun AlertCard(alert: AlertItem, onApprove: () -> Unit, onBlock: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = alert.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
-                    Text(text = "App: ${alert.app}", style = MaterialTheme.typography.bodySmall)
+                    Text(text = "${alert.childEmail} • ${alert.app} • ${alert.time}", style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -169,4 +185,4 @@ fun AlertCard(alert: AlertItem, onApprove: () -> Unit, onBlock: () -> Unit) {
     }
 }
 
-data class AlertItem(val id: String, val title: String, val app: String, val time: String)
+data class AlertItem(val id: String, val title: String, val app: String, val time: String, val childEmail: String)

@@ -1,5 +1,6 @@
 package com.example.shielmind.ui.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -88,8 +89,20 @@ fun AuthScreen(
                                 // Fetch role from Firestore
                                 db.collection("users").document(result.user!!.uid).get()
                                     .addOnSuccessListener { doc ->
-                                        val role = doc.getString("role") ?: "parent"
-                                        onAuthSuccess(role == "parent")
+                                        if (doc.exists()) {
+                                            val role = doc.getString("role") ?: "parent"
+                                            onAuthSuccess(role == "parent")
+                                        } else {
+                                            // Si le document n'existe pas, on le crée par défaut
+                                            val role = "parent"
+                                            val newUser = hashMapOf(
+                                                "email" to email,
+                                                "role" to role,
+                                                "uid" to result.user!!.uid
+                                            )
+                                            db.collection("users").document(result.user!!.uid).set(newUser)
+                                            onAuthSuccess(true)
+                                        }
                                     }
                             }
                             .addOnFailureListener {
@@ -99,14 +112,21 @@ fun AuthScreen(
                     } else {
                         auth.createUserWithEmailAndPassword(email, password)
                             .addOnSuccessListener { result ->
+                                val uid = result.user!!.uid
                                 val user = hashMapOf(
                                     "email" to email,
                                     "role" to if (isParent) "parent" else "enfant",
-                                    "uid" to result.user!!.uid
+                                    "uid" to uid,
+                                    "createdAt" to System.currentTimeMillis()
                                 )
-                                db.collection("users").document(result.user!!.uid).set(user)
+                                db.collection("users").document(uid).set(user)
                                     .addOnSuccessListener {
+                                        Log.d("AuthScreen", "Profil utilisateur créé pour $uid")
                                         onAuthSuccess(isParent)
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isLoading = false
+                                        Toast.makeText(context, "Erreur Firestore: ${e.message}", Toast.LENGTH_LONG).show()
                                     }
                             }
                             .addOnFailureListener {
