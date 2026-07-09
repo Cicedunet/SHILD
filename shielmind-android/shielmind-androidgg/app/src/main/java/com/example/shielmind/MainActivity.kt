@@ -59,6 +59,10 @@ class MainActivity : ComponentActivity() {
                             onUnblockRequest = {
                                 Toast.makeText(this@MainActivity, "Demande envoyée au parent", Toast.LENGTH_SHORT).show()
                                 // Optionnel: on pourrait notifier le parent via Firestore ici aussi
+                            },
+                            onSafeExit = {
+                                // Minimize app / go to home screen
+                                moveTaskToBack(true)
                             }
                         )
                     } else {
@@ -82,9 +86,13 @@ class MainActivity : ComponentActivity() {
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
             if (user != null) {
-                FirebaseSyncManager.listenForParentDecision(user.uid) { approvedText ->
-                    Toast.makeText(this, "Parent a autorisé : $approvedText", Toast.LENGTH_LONG).show()
-                    blockReasonState.value = null
+                FirebaseSyncManager.listenForParentDecision(user.uid) { text, isApproved ->
+                    if (isApproved) {
+                        Toast.makeText(this, "Parent a autorisé : $text", Toast.LENGTH_LONG).show()
+                        blockReasonState.value = null
+                    } else {
+                        Toast.makeText(this, "Parent a confirmé le blocage de : $text", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }

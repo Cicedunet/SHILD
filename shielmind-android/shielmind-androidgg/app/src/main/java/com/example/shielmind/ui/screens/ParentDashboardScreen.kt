@@ -123,7 +123,7 @@ fun ParentDashboardScreen() {
                                 db.collection("alerts").document(alert.id).update("status", "approved")
                             },
                             onBlock = {
-                                db.collection("alerts").document(alert.id).update("status", "dismissed")
+                                db.collection("alerts").document(alert.id).update("status", "confirmed")
                             }
                         )
                     }
@@ -168,7 +168,7 @@ fun AlertCard(alert: AlertItem, onApprove: () -> Unit, onBlock: () -> Unit) {
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onBlock) {
-                    Text("Ignorer", color = Color.Gray)
+                    Text("Confirmer le blocage", color = Color(0xFFD32F2F))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -178,7 +178,7 @@ fun AlertCard(alert: AlertItem, onApprove: () -> Unit, onBlock: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Autoriser")
+                    Text("Débloquer")
                 }
             }
         }

@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun EducationalBlockScreen(
-    onUnblockRequest: () -> Unit
+    onUnblockRequest: () -> Unit,
+    onSafeExit: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(
@@ -92,7 +93,7 @@ fun EducationalBlockScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
-                        onClick = { /* Action retour */ },
+                        onClick = onSafeExit,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))

@@ -81,22 +81,30 @@ object FirebaseSyncManager {
     }
 
     /**
-     * Écoute les changements de décision du parent pour un contenu spécifique.
+     * Écoute les changements de décision du parent (Autorisation ou Confirmation de blocage).
      */
-    fun listenForParentDecision(childId: String, onDecision: (String) -> Unit) {
+    fun listenForParentDecision(childId: String, onDecision: (String, Boolean) -> Unit) {
         val database = db ?: return
         database.collection("alerts")
             .whereEqualTo("childId", childId)
-            .whereEqualTo("status", "approved")
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
                     Log.e("FirebaseSyncManager", "Erreur d'écoute : ${e.message}")
                     return@addSnapshotListener
                 }
                 for (doc in snapshots!!) {
-                    onDecision(doc.getString("text") ?: "")
-                    // Une fois approuvé, on peut nettoyer ou marquer comme "notified"
-                    doc.reference.update("status", "notified")
+                    val status = doc.getString("status")
+                    val text = doc.getString("text") ?: ""
+
+                    if (status == "approved") {
+                        // Le parent a autorisé : on débloque l'enfant
+                        onDecision(text, true)
+                        doc.reference.update("status", "notified_approved")
+                    } else if (status == "confirmed") {
+                        // Le parent a confirmé le blocage : on notifie juste l'enfant
+                        onDecision(text, false)
+                        doc.reference.update("status", "notified_confirmed")
+                    }
                 }
             }
     }
