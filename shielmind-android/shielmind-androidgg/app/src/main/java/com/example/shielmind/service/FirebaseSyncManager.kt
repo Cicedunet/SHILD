@@ -54,7 +54,7 @@ object FirebaseSyncManager {
      * Enregistre le token FCM de l'appareil.
      */
     fun updateFcmToken(userId: String, token: String) {
-        db.collection("users").document(userId).update("fcmToken", token)
+        db?.collection("users")?.document(userId)?.update("fcmToken", token)
     }
 
     /**
