@@ -23,6 +23,9 @@ class ShieldFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d("ShieldFCM", "Refreshed token: $token")
-        // Send token to backend or save locally
+        val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            FirebaseSyncManager.updateFcmToken(user.uid, token)
+        }
     }
 }

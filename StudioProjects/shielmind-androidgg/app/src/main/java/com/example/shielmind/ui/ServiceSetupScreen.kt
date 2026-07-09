@@ -54,6 +54,9 @@ fun ServiceSetupScreen() {
             )
         }
     ) { padding ->
+    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+    val userId = auth.currentUser?.uid ?: "???"
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -63,7 +66,7 @@ fun ServiceSetupScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "ID de jumelage : CHILD_8842",
+            text = "Votre ID enfant : $userId",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
@@ -105,6 +108,20 @@ fun ServiceSetupScreen() {
             )
 
             Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    val intent = android.content.Intent(context, com.example.shielmind.MainActivity::class.java).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        putExtra("BLOCK_REASON", "TEST_MANUEL")
+                    }
+                    context.startActivity(intent)
+                },
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Text("Tester le blocage (Simulé)", fontSize = 12.sp)
+            }
 
             AnimatedVisibility(
                 visible = isAccessibilityEnabled && isDeviceAdmin,
