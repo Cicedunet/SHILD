@@ -14,6 +14,7 @@ class ShieldAccessibilityService : AccessibilityService() {
 
     private val throttler = CaptureThrottler()
     private lateinit var classifier: TFLiteClassifier
+    private var cachedParentId: String? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -69,13 +70,24 @@ class ShieldAccessibilityService : AccessibilityService() {
     private fun sendAlertToParent(content: CapturedContent) {
         val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
         val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-        val currentChildId = auth.currentUser?.uid ?: "anonymous_child"
+        val currentChildId = auth.currentUser?.uid ?: return
+
+        if (cachedParentId != null) {
+            com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
+                childId = currentChildId,
+                parentId = cachedParentId!!,
+                contentText = content.text,
+                sourceApp = content.sourceApp
+            )
+            return
+        }
 
         // On cherche le parent lié dans Firestore
         db.collection("links").document(currentChildId).get()
             .addOnSuccessListener { doc ->
                 val parentId = doc.getString("parentId")
                 if (parentId != null) {
+                    cachedParentId = parentId
                     com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
                         childId = currentChildId,
                         parentId = parentId,
