@@ -14,6 +14,7 @@ class ShieldAccessibilityService : AccessibilityService() {
 
     private val throttler = CaptureThrottler()
     private lateinit var classifier: TFLiteClassifier
+    private var cachedParentId: String? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -67,16 +68,37 @@ class ShieldAccessibilityService : AccessibilityService() {
     }
 
     private fun sendAlertToParent(content: CapturedContent) {
-        val currentChildId = "child_user_123"
-        val linkedParentId = "parent_user_456"
+        val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        val currentChildId = auth.currentUser?.uid ?: return
 
-        com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
-            childId = currentChildId,
-            parentId = linkedParentId,
-            contentText = content.text,
-            sourceApp = content.sourceApp
-        )
-        Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent.")
+        if (cachedParentId != null) {
+            com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
+                childId = currentChildId,
+                parentId = cachedParentId!!,
+                contentText = content.text,
+                sourceApp = content.sourceApp
+            )
+            return
+        }
+
+        // On cherche le parent lié dans Firestore
+        db.collection("links").document(currentChildId).get()
+            .addOnSuccessListener { doc ->
+                val parentId = doc.getString("parentId")
+                if (parentId != null) {
+                    cachedParentId = parentId
+                    com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
+                        childId = currentChildId,
+                        parentId = parentId,
+                        contentText = content.text,
+                        sourceApp = content.sourceApp
+                    )
+                    Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent : $parentId")
+                } else {
+                    Log.w(TAG, "Aucun parent lié trouvé pour cet enfant.")
+                }
+            }
     }
 
     private fun extractAllText(node: AccessibilityNodeInfo): String {

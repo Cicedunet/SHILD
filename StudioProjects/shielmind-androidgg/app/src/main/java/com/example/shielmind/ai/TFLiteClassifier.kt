@@ -2,34 +2,27 @@ package com.example.shielmind.ai
 
 import android.content.Context
 import android.util.Log
-import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
 class TFLiteClassifier(context: Context) {
 
     private var interpreter: Interpreter? = null
-    private val inputSequenceLength = 128
+    private val inputSequenceLength = 128 // Taille attendue par votre modèle
 
     init {
         try {
             val modelBuffer = loadModelFile(context, "shieldmindv2.tflite")
-            val options = Interpreter.Options()
-            options.setNumThreads(4)
-            interpreter = Interpreter(modelBuffer, options)
-            
+            interpreter = Interpreter(modelBuffer)
+            Log.d("TFLiteClassifier", "Modèle chargé avec succès.")
+
+            // Log model details for debugging
             val inputTensor = interpreter?.getInputTensor(0)
-            val outputTensor = interpreter?.getOutputTensor(0)
-            
-            Log.i("TFLiteClassifier", "Modèle chargé avec succès.")
-            Log.i("TFLiteClassifier", "Format Entrée: ${inputTensor?.dataType()} Shape: ${inputTensor?.shape()?.contentToString()}")
-            Log.i("TFLiteClassifier", "Format Sortie: ${outputTensor?.dataType()} Shape: ${outputTensor?.shape()?.contentToString()}")
+            Log.d("TFLiteClassifier", "Type d'entrée attendu : ${inputTensor?.dataType()}")
         } catch (e: Exception) {
-            Log.e("TFLiteClassifier", "Erreur lors du chargement : ${e.message}")
+            Log.e("TFLiteClassifier", "Erreur lors du chargement du modèle : ${e.message}")
         }
     }
 
@@ -42,74 +35,49 @@ class TFLiteClassifier(context: Context) {
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
+    /**
+     * Prépare le texte (tokenisation) et l'analyse via le modèle TFLite.
+     */
     fun classify(text: String): Float {
-        val interp = interpreter ?: return 0.1f
-        if (text.isBlank()) return 0.05f
+        if (interpreter == null || text.isBlank()) return 0f
+
+        // 0. Fallback Mots-clés Prioritaires (Détection immédiate pour contenus ultra-toxiques)
+        val priorityKeywords = listOf("porno", "porn", "sex", "1xbet", "megapari", "insulte", "haine", "violence")
+        if (priorityKeywords.any { text.contains(it, ignoreCase = true) }) {
+            Log.d("TFLiteClassifier", "Toxicité détectée via mots-clés prioritaires.")
+            return 0.98f
+        }
+
+        // 1. Préparation de l'entrée (Type INT32 attendu par le modèle shieldmindv2.tflite)
+        val input = Array(1) { IntArray(inputSequenceLength) }
+        val tokens = tokenize(text)
+
+        for (i in 0 until inputSequenceLength) {
+            input[0][i] = if (i < tokens.size) tokens[i] else 0 // Padding avec 0
+        }
+
+        // 2. Préparation de la sortie (Probabilité FLOAT32 entre 0 et 1)
+        val output = Array(1) { FloatArray(1) }
 
         try {
-            val inputTensor = interp.getInputTensor(0)
-            val outputTensor = interp.getOutputTensor(0)
-
-            // 1. Préparation du Buffer d'entrée (INT32 ou INT8 selon le modèle)
-            val inputBuffer = ByteBuffer.allocateDirect(inputTensor.numBytes())
-            inputBuffer.order(ByteOrder.nativeOrder())
-
-            val tokens = tokenize(text)
-            for (i in 0 until inputSequenceLength) {
-                val token = if (i < tokens.size) tokens[i] else 0
-                if (inputTensor.dataType() == DataType.INT32) {
-                    inputBuffer.putInt(token)
-                } else {
-                    inputBuffer.put(token.toByte())
-                }
-            }
-            inputBuffer.rewind()
-
-            // 2. Préparation du Buffer de sortie (INT8 pour votre modèle)
-            val outputBuffer = ByteBuffer.allocateDirect(outputTensor.numBytes())
-            outputBuffer.order(ByteOrder.nativeOrder())
-
-            // 3. Inférence via les buffers directs (évite les erreurs de conversion Java array)
-            interp.run(inputBuffer, outputBuffer)
-
-            // 4. Lecture et déquantification
-            outputBuffer.rewind()
-            var score: Float
-            
-            if (outputTensor.dataType() == DataType.FLOAT32) {
-                score = outputBuffer.float
-            } else {
-                // Modèle quantifié : score = (valeur_brute - zero_point) * scale
-                val rawByte = outputBuffer.get().toInt()
-                val params = outputTensor.quantizationParams()
-                
-                if (params.scale != 0f) {
-                    score = (rawByte - params.zeroPoint) * params.scale
-                } else {
-                    // Fallback si les métadonnées de quantification sont absentes
-                    score = (rawByte.toFloat() + 128f) / 255.0f
-                }
-            }
-
-            Log.d("TFLiteClassifier", "Texte: \"${text.take(20)}\" -> Score IA: $score")
-
-            // 5. Filtre de sécurité par mots-clés
-            val blacklist = listOf("porno", "porn", "sex", "1xbet", "megapari", "casino")
-            if (blacklist.any { text.contains(it, ignoreCase = true) }) {
-                return if (score > 0.9f) score else 0.99f
-            }
+            // 3. Exécution de l'inférence
+            interpreter?.run(input, output)
+            val score = output[0][0]
+            Log.d("TFLiteClassifier", "Score d'inférence IA pour \"${text.take(20)}...\" : $score")
 
             return score
         } catch (e: Exception) {
-            Log.e("TFLiteClassifier", "Erreur inférence : ${e.message}")
-            return if (text.contains("porn", ignoreCase = true)) 0.99f else 0.1f
+            Log.e("TFLiteClassifier", "Erreur lors de l'inférence : ${e.message}")
+            // En cas d'erreur de l'IA, on se base sur une détection par mots-clés simplifiée par sécurité
+            return if (priorityKeywords.any { text.contains(it, ignoreCase = true) }) 0.95f else 0.1f
         }
     }
 
+    /**
+     * Convertit le texte en une liste d'entiers (tokens).
+     */
     private fun tokenize(text: String): List<Int> {
-        // Tokenisation simple par code de caractère (Unicode)
-        // Note: Si le modèle a été entraîné avec un vocabulaire spécifique, 
-        // cette fonction doit être remplacée par une recherche dans vocab.txt.
+        // Tokenisation par caractère simplifiée
         return text.lowercase().map { it.code }
     }
 }
