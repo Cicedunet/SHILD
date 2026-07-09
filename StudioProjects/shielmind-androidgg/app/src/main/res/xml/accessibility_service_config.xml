@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ════════════════════════════════════════════════════════
+    À CRÉER DANS : app/src/main/res/xml/accessibility_service_config.xml
+    (créer le dossier "xml" dans res/ s'il n'existe pas)
+    ════════════════════════════════════════════════════════
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeViewTextChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="300"
+    android:description="@string/accessibility_service_description" />
+
+    <!--
+        EXPLICATION LIGNE PAR LIGNE (le coeur de la config) :
+
+        accessibilityEventTypes
+            → On choisit SEULEMENT 3 types d'événements parmi la dizaine
+              qu'Android propose, pour ne pas gaspiller de batterie/CPU :
+
+              • typeWindowContentChanged : le contenu d'une fenêtre a changé
+                (ex: nouveau message qui arrive dans WhatsApp)
+
+              • typeWindowStateChanged : on a changé d'écran/d'app
+                (ex: l'enfant ouvre Chrome après avoir fermé Instagram)
+
+              • typeViewTextChanged : du texte a été tapé/modifié
+                (ex: l'enfant tape un message)
+
+        canRetrieveWindowContent="true"
+            → LA LIGNE LA PLUS IMPORTANTE.
+              Sans elle, on reçoit juste "quelque chose a changé"
+              mais on ne peut PAS lire le texte. Avec elle, on peut
+              parcourir l'arbre des éléments et extraire le texte.
+
+        notificationTimeout="300"
+            → Attend 300ms avant de nous notifier après un changement.
+              Évite de nous spammer si l'écran change 10 fois par seconde
+              (ex: pendant un scroll rapide). Bon compromis réactivité/perf.
+
+        accessibilityFlags
+            → flagReportViewIds : on reçoit aussi l'identifiant technique
+              de chaque élément (utile pour debug plus tard)
+            → flagRetrieveInteractiveWindows : inclut aussi les popups,
+              dialogues, claviers, etc.
+
+        PAS de packageNames spécifié
+            → Volontairement ABSENT. Si on le mettait, ça limiterait
+              le service à certaines apps seulement (ex: juste WhatsApp).
+              On le laisse vide pour couvrir TOUTES les apps, comme
+              décidé dans l'architecture.
+    -->

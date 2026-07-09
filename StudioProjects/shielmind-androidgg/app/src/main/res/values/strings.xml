@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">ShielMind</string>
+    <string name="accessibility_service_label">ShieldMind Protection</string>
+    <string name="accessibility_service_description">ShieldMind analyse le texte affiché à l\'écran pour détecter et bloquer les contenus inappropriés, en local sur l\'appareil, sans connexion internet.</string>
+    <string name="device_admin_description">ShieldMind utilise les droits administrateur pour empêcher sa désinstallation non autorisée et protéger votre enfant contre les contenus inappropriés.</string>
+</resources>
