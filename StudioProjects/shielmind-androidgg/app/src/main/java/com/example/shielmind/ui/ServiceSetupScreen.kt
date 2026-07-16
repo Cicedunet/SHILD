@@ -1,6 +1,7 @@
 package com.example.shielmind.ui
 
 import android.app.Activity
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -54,8 +55,8 @@ fun ServiceSetupScreen() {
             )
         }
     ) { padding ->
-    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-    val userId = auth.currentUser?.uid ?: "???"
+        val prefs = remember { context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE) }
+        val childEmail = prefs.getString("child_email", "Enfant") ?: "Enfant"
 
         Column(
             modifier = Modifier
@@ -66,7 +67,7 @@ fun ServiceSetupScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-            text = "Votre ID enfant : $userId",
+                text = "Email Enfant : $childEmail",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,

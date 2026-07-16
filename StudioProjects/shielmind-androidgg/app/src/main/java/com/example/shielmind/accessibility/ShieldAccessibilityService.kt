@@ -1,27 +1,48 @@
 package com.example.shielmind.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.shielmind.ai.TFLiteClassifier
+import com.example.shielmind.service.EmailSender
 
 class ShieldAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "ShieldMind_Service"
+
+        // Common Android browser packages to analyze
+        private val BROWSER_PACKAGES = setOf(
+            "com.android.chrome",
+            "org.mozilla.firefox",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.sec.android.app.sbrowser",
+            "com.duckduckgo.mobile.android",
+            "com.brave.browser",
+            "com.android.browser",
+            "org.mozilla.focus"
+        )
     }
 
     private val throttler = CaptureThrottler()
     private lateinit var classifier: TFLiteClassifier
-    private var cachedParentId: String? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
         val packageName = event.packageName?.toString() ?: "inconnu"
-        val rootNode: AccessibilityNodeInfo? = event.source
 
+        // ════════════════════════════════════════════════════════
+        // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS NAVIGATEUR EN DEHORS DE L'APP ON N'ANALYSE RIEN
+        // ════════════════════════════════════════════════════════
+        if (!BROWSER_PACKAGES.contains(packageName)) {
+            return
+        }
+
+        val rootNode: AccessibilityNodeInfo? = event.source
         if (rootNode == null) return
 
         val rawText = extractAllText(rootNode)
@@ -44,61 +65,69 @@ class ShieldAccessibilityService : AccessibilityService() {
                 "${content.characterCount} caractères, " +
                 "texte=\"${content.text.take(100)}...\"")
 
-        // ANALYSE IA (TFLite)
-        val toxicityScore = classifier.classify(content.text)
-        Log.d(TAG, "Score de toxicité détecté : $toxicityScore")
+        // ════════════════════════════════════════════════════════
+        // DÉTECTION DICTIONNAIRE & IA (TFLite)
+        // ════════════════════════════════════════════════════════
+        val isDictionaryToxic = InappropriateContentFilter.containsInappropriateContent(content.text)
+        val toxicityScore = if (isDictionaryToxic) {
+            Log.d(TAG, "Toxicité détectée via dictionnaire local.")
+            1.0f
+        } else {
+            classifier.classify(content.text)
+        }
+
+        Log.d(TAG, "Score de toxicité final : $toxicityScore")
 
         if (toxicityScore > 0.8f) { // Seuil de blocage
             Log.w(TAG, "CONTENU TOXIQUE DÉTECTÉ ! Blocage en cours...")
-            showBlockingUI(content.text)
-            sendAlertToParent(content)
+
+            // Ferme uniquement l'onglet/page active du navigateur en effectuant un retour
+            performGlobalAction(GLOBAL_ACTION_BACK)
+
+            // Envoi de l'alerte par mail au parent
+            sendAlertToParentByEmail(content)
         }
     }
 
-    private fun showBlockingUI(reason: String) {
-        // Envoi d'un broadcast ou démarrage d'activité pour bloquer
-        // Pour une fiabilité maximale en arrière-plan, on utilise FLAG_ACTIVITY_CLEAR_TOP
-        val intent = android.content.Intent(this, com.example.shielmind.MainActivity::class.java).apply {
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra("BLOCK_REASON", reason)
-        }
-        startActivity(intent)
-        Log.i(TAG, "Écran de blocage activé pour l'application en cours.")
-    }
+    private fun sendAlertToParentByEmail(content: CapturedContent) {
+        val prefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+        val childEmail = prefs.getString("child_email", "") ?: ""
+        val parentEmail = prefs.getString("parent_email", "") ?: ""
 
-    private fun sendAlertToParent(content: CapturedContent) {
-        val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-        val currentChildId = auth.currentUser?.uid ?: return
-
-        if (cachedParentId != null) {
-            com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
-                childId = currentChildId,
-                parentId = cachedParentId!!,
-                contentText = content.text,
-                sourceApp = content.sourceApp
-            )
+        if (parentEmail.isBlank()) {
+            Log.e(TAG, "Impossible d'envoyer le mail : email parent non configuré.")
             return
         }
 
-        // On cherche le parent lié dans Firestore
-        db.collection("links").document(currentChildId).get()
-            .addOnSuccessListener { doc ->
-                val parentId = doc.getString("parentId")
-                if (parentId != null) {
-                    cachedParentId = parentId
-                    com.example.shielmind.service.FirebaseSyncManager.reportBlockedContent(
-                        childId = currentChildId,
-                        parentId = parentId,
-                        contentText = content.text,
-                        sourceApp = content.sourceApp
-                    )
-                    Log.i(TAG, "Alerte synchronisée sur Firebase pour le parent : $parentId")
-                } else {
-                    Log.w(TAG, "Aucun parent lié trouvé pour cet enfant.")
-                }
+        val subject = "[ShieldMind] Alerte : Contenu inapproprié bloqué"
+        val bodyText = """
+            Bonjour,
+
+            Une alerte de contenu inapproprié a été détectée et bloquée sur l'appareil de votre enfant ($childEmail).
+
+            Détails de l'alerte :
+            - Application : ${content.sourceApp}
+            - Texte détecté :
+            ${content.text}
+
+            La page contenant ce contenu inapproprié a été fermée immédiatement sur l'appareil de votre enfant.
+
+            Cordialement,
+            L'équipe ShieldMind
+        """.trimIndent()
+
+        EmailSender.sendEmail(
+            context = this,
+            recipientEmail = parentEmail,
+            subject = subject,
+            bodyText = bodyText,
+            onSuccess = {
+                Log.i(TAG, "Mail d'alerte envoyé avec succès au parent : $parentEmail")
+            },
+            onFailure = { e ->
+                Log.e(TAG, "Échec de l'envoi du mail d'alerte au parent : ${e.message}")
             }
+        )
     }
 
     private fun extractAllText(node: AccessibilityNodeInfo): String {
