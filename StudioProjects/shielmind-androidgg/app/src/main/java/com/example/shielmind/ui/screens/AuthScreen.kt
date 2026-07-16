@@ -1,38 +1,44 @@
 package com.example.shielmind.ui.screens
 
-import android.util.Log
+import android.content.Context
 import android.widget.Toast
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun AuthScreen(
     onAuthSuccess: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
-    var isLogin by remember { mutableStateOf(true) }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isParent by remember { mutableStateOf(true) }
-    var isLoading by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
-    val auth = FirebaseAuth.getInstance()
-    val db = FirebaseFirestore.getInstance()
+    var childEmail by remember { mutableStateOf("") }
+    var parentEmail by remember { mutableStateOf("") }
+    var smtpHost by remember { mutableStateOf("smtp.gmail.com") }
+    var smtpPort by remember { mutableStateOf("587") }
+    var smtpUser by remember { mutableStateOf("") }
+    var smtpPassword by remember { mutableStateOf("") }
+
+    // Pre-fill smtpUser with parentEmail as a helpful default
+    LaunchedEffect(parentEmail) {
+        if (smtpUser.isBlank() || smtpUser == parentEmail.substringBefore("@") /* dynamic helper */) {
+            smtpUser = parentEmail
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -43,106 +49,120 @@ fun AuthScreen(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        Text(text = if (isLogin) "Connexion" else "Créer un compte", color = Color.Gray)
-
-        Spacer(modifier = Modifier.height(32.dp))
+        Text(
+            text = "Enregistrement & Configuration SMTP",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
         OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
+            value = childEmail,
+            onValueChange = { childEmail = it.trim() },
+            label = { Text("Email Enfant") },
+            placeholder = { Text("ex: enfant@gmail.com") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = parentEmail,
+            onValueChange = { parentEmail = it.trim() },
+            label = { Text("Email Parent") },
+            placeholder = { Text("ex: parent@gmail.com") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Divider()
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Paramètres de messagerie (SMTP)",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        Text(
+            text = "Nécessaire pour envoyer des alertes par mail au parent de manière autonome sans serveur.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(vertical = 4.dp).align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = smtpHost,
+            onValueChange = { smtpHost = it.trim() },
+            label = { Text("Serveur SMTP") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Mot de passe") },
+            value = smtpPort,
+            onValueChange = { smtpPort = it.trim() },
+            label = { Text("Port SMTP") },
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (!isLogin) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = isParent, onClick = { isParent = true })
-                Text("Parent")
-                Spacer(modifier = Modifier.width(16.dp))
-                RadioButton(selected = !isParent, onClick = { isParent = false })
-                Text("Enfant")
-            }
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = smtpUser,
+            onValueChange = { smtpUser = it.trim() },
+            label = { Text("Utilisateur SMTP (Expéditeur)") },
+            placeholder = { Text("ex: parent@gmail.com") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = smtpPassword,
+            onValueChange = { smtpPassword = it },
+            label = { Text("Mot de passe d'application SMTP") },
+            placeholder = { Text("Mot de passe d'application ou d'accès") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            Button(
-                onClick = {
-                    if (email.isBlank() || password.isBlank()) return@Button
-                    isLoading = true
-                    if (isLogin) {
-                        auth.signInWithEmailAndPassword(email, password)
-                            .addOnSuccessListener { result ->
-                                // Fetch role from Firestore
-                                db.collection("users").document(result.user!!.uid).get()
-                                    .addOnSuccessListener { doc ->
-                                        if (doc.exists()) {
-                                            val role = doc.getString("role") ?: "parent"
-                                            onAuthSuccess(role == "parent")
-                                        } else {
-                                            // Si le document n'existe pas, on le crée par défaut
-                                            val role = "parent"
-                                            val newUser = hashMapOf(
-                                                "email" to email,
-                                                "role" to role,
-                                                "uid" to result.user!!.uid
-                                            )
-                                            db.collection("users").document(result.user!!.uid).set(newUser)
-                                            onAuthSuccess(true)
-                                        }
-                                    }
-                            }
-                            .addOnFailureListener {
-                                isLoading = false
-                                Toast.makeText(context, "Erreur: ${it.message}", Toast.LENGTH_LONG).show()
-                            }
-                    } else {
-                        auth.createUserWithEmailAndPassword(email, password)
-                            .addOnSuccessListener { result ->
-                                val uid = result.user!!.uid
-                                val user = hashMapOf(
-                                    "email" to email,
-                                    "role" to if (isParent) "parent" else "enfant",
-                                    "uid" to uid,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("users").document(uid).set(user)
-                                    .addOnSuccessListener {
-                                        Log.d("AuthScreen", "Profil utilisateur créé pour $uid")
-                                        onAuthSuccess(isParent)
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isLoading = false
-                                        Toast.makeText(context, "Erreur Firestore: ${e.message}", Toast.LENGTH_LONG).show()
-                                    }
-                            }
-                            .addOnFailureListener {
-                                isLoading = false
-                                Toast.makeText(context, "Erreur: ${it.message}", Toast.LENGTH_LONG).show()
-                            }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (isLogin) "Se connecter" else "S'inscrire")
-            }
+        Button(
+            onClick = {
+                if (childEmail.isBlank() || parentEmail.isBlank()) {
+                    Toast.makeText(context, "Veuillez saisir les adresses emails de l'enfant et du parent.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                if (smtpUser.isBlank() || smtpPassword.isBlank()) {
+                    Toast.makeText(context, "Veuillez configurer les identifiants SMTP pour l'envoi de mails.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
 
-            TextButton(onClick = { isLogin = !isLogin }) {
-                Text(if (isLogin) "Pas encore de compte ? S'inscrire" else "Déjà un compte ? Se connecter")
-            }
+                // Sauvegarde locale dans SharedPreferences
+                val prefs = context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putString("child_email", childEmail)
+                    putString("parent_email", parentEmail)
+                    putString("smtp_host", smtpHost)
+                    putString("smtp_port", smtpPort)
+                    putString("smtp_user", smtpUser)
+                    putString("smtp_password", smtpPassword)
+                    apply()
+                }
+
+                Toast.makeText(context, "Configuration sauvegardée avec succès !", Toast.LENGTH_SHORT).show()
+                // Redirection directe vers la configuration du service
+                onAuthSuccess(false)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Text("Sauvegarder et Continuer")
         }
     }
 }

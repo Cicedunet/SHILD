@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    AndroidManifest.xml MIS À JOUR avec Device Administrator et Application class
-    Remplace : app/src/main/AndroidManifest.xml
+    AndroidManifest.xml MIS À JOUR
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permission Internet nécessaire pour l'envoi de mail SMTP -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".ShieldMindApplication"
@@ -32,7 +34,7 @@
         </activity>
 
         <!-- ════════════════════════════════════════════════════════
-             SERVICE D'ACCESSIBILITÉ (déjà présent dans votre projet)
+             SERVICE D'ACCESSIBILITÉ
              Analyse les textes affichés à l'écran via AccessibilityService
              ════════════════════════════════════════════════════════ -->
         <service
@@ -49,18 +51,7 @@
         </service>
 
         <!-- ════════════════════════════════════════════════════════
-             SERVICE DE MESSAGERIE FIREBASE
-             ════════════════════════════════════════════════════════ -->
-        <service
-            android:name=".service.ShieldFirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-
-        <!-- ════════════════════════════════════════════════════════
-             ✅ NOUVEAU : DEVICE ADMINISTRATOR RECEIVER
+             DEVICE ADMINISTRATOR RECEIVER
              Empêche la désinstallation non autorisée de l'app.
              ════════════════════════════════════════════════════════ -->
         <receiver
