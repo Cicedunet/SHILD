@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -155,6 +157,12 @@ fun ProtectionTab(
     deviceAdminLauncher: androidx.activity.result.ActivityResultLauncher<android.content.Intent>
 ) {
     val scrollState = rememberScrollState()
+    val prefs = remember { context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE) }
+
+    // PIN Modification state
+    var showPinChangeDialog by remember { mutableStateOf(false) }
+    var newPin by remember { mutableStateOf("") }
+    var currentStoredPin by remember { mutableStateOf(prefs.getString("parent_pin", "0000") ?: "0000") }
 
     Column(
         modifier = Modifier
@@ -286,6 +294,41 @@ fun ProtectionTab(
             }
         }
 
+        // PIN Modification Section
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Code PIN Parental",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Code PIN actuel : $currentStoredPin",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Button(
+                    onClick = { showPinChangeDialog = true },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                ) {
+                    Text("Modifier", fontSize = 12.sp)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(18.dp))
 
         // Steps cards
@@ -329,6 +372,49 @@ fun ProtectionTab(
             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text("Tester une simulation de blocage", fontSize = 12.sp)
+        }
+
+        // Dialog for PIN changing
+        if (showPinChangeDialog) {
+            AlertDialog(
+                onDismissRequest = { showPinChangeDialog = false },
+                title = { Text("Modifier le code PIN", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("Saisissez un nouveau code PIN parental à 4 chiffres :")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newPin,
+                            onValueChange = { if (it.length <= 4) newPin = it.filter { char -> char.isDigit() } },
+                            placeholder = { Text("ex: 1234") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newPin.length == 4) {
+                                prefs.edit().putString("parent_pin", newPin).apply()
+                                currentStoredPin = newPin
+                                showPinChangeDialog = false
+                                newPin = ""
+                                Toast.makeText(context, "Code PIN mis à jour avec succès !", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Le code PIN doit comporter exactement 4 chiffres.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Text("Enregistrer")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPinChangeDialog = false }) {
+                        Text("Annuler")
+                    }
+                }
+            )
         }
     }
 }
