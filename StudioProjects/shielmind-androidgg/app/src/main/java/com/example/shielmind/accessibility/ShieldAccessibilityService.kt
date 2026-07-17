@@ -77,14 +77,8 @@ class ShieldAccessibilityService : AccessibilityService() {
                 "${content.characterCount} caractères, " +
                 "texte=\"${content.text.take(100)}...\"")
 
-        // DÉTECTION DICTIONNAIRE & IA (TFLite)
-        val isDictionaryToxic = InappropriateContentFilter.containsInappropriateContent(content.text)
-        val toxicityScore = if (isDictionaryToxic) {
-            Log.d(TAG, "Toxicité détectée via dictionnaire local.")
-            1.0f
-        } else {
-            classifier.classify(content.text)
-        }
+        // DÉTECTION IA UNIQUEMENT (TFLite)
+        val toxicityScore = classifier.classify(content.text)
 
         Log.d(TAG, "Score de toxicité final : $toxicityScore")
 
