@@ -65,7 +65,8 @@ class TFLiteClassifier(context: Context) {
 
             // Les classes 1 à 7 correspondent aux catégories de toxicité/inapproprié (violence, porn, haine, drogues, etc.)
             // La classe 0 correspond au contenu sain (clean)
-            val scores = output[0].map { (it.toInt() and 0xFF) / 255.0f }
+            // On déquantifie le byte signé de [-128, 127] vers un score float de [0.0, 1.0]
+            val scores = output[0].map { (it.toInt() + 128) / 255.0f }
 
             var maxToxicScore = 0.0f
             for (i in 1 until scores.size) {
@@ -74,7 +75,7 @@ class TFLiteClassifier(context: Context) {
                 }
             }
 
-            Log.d("TFLiteClassifier", "Scores d'inférence IA complets : $scores | Score toxique max : $maxToxicScore pour \"${text.take(20)}...\"")
+            Log.d("TFLiteClassifier", "Scores d'inférence IA complets (déquantifiés) : $scores | Score toxique max : $maxToxicScore pour \"${text.take(20)}...\"")
 
             return maxToxicScore
         } catch (e: Exception) {
