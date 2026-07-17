@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -31,6 +33,7 @@ fun AuthScreen(
 
     var childEmail by remember { mutableStateOf("") }
     var parentEmail by remember { mutableStateOf("") }
+    var parentPin by remember { mutableStateOf("") }
     var selectedAgeProfile by remember { mutableStateOf("enfant") } // default: enfant
 
     // Default configuration
@@ -136,6 +139,25 @@ fun AuthScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Parent PIN Creation (4 digits)
+                    OutlinedTextField(
+                        value = parentPin,
+                        onValueChange = { if (it.length <= 4) parentPin = it.filter { char -> char.isDigit() } },
+                        label = { Text("Code PIN Parent (4 chiffres)", color = Color.Gray) },
+                        placeholder = { Text("ex: 1234") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF64B5F6),
+                            unfocusedBorderColor = Color.Gray,
+                            cursorColor = Color(0xFF64B5F6)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Profile Section Header
@@ -158,15 +180,14 @@ fun AuthScreen(
                             Triple("adulte", "Adulte", "Tolérante (0.85)")
                         ).forEach { (key, label, desc) ->
                             val isSelected = selectedAgeProfile == key
-                            val scale by animateFloatAsState(targetValue = if (isSelected) 1.03f else 0.97f, label = "cardScale")
-                            val cardBgColor = if (isSelected) Color(0xFF1976D2).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.04f)
+                            val btnBgColor = if (isSelected) Color(0xFF1976D2).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.04f)
                             val borderColor = if (isSelected) Color(0xFF64B5F6) else Color.Transparent
 
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .border(2.dp, borderColor, RoundedCornerShape(14.dp))
-                                    .background(cardBgColor, RoundedCornerShape(14.dp))
+                                    .background(btnBgColor, RoundedCornerShape(14.dp))
                                     .clickable { selectedAgeProfile = key }
                                     .padding(vertical = 14.dp, horizontal = 4.dp),
                                 contentAlignment = Alignment.Center
@@ -201,12 +222,17 @@ fun AuthScreen(
                                 Toast.makeText(context, "Veuillez saisir les adresses emails de l'enfant et du parent.", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
+                            if (parentPin.length != 4) {
+                                Toast.makeText(context, "Le code PIN parent doit comporter exactement 4 chiffres.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
 
                             // Store local configs securely
                             val prefs = context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
                             prefs.edit().apply {
                                 putString("child_email", childEmail)
                                 putString("parent_email", parentEmail)
+                                putString("parent_pin", parentPin)
                                 putString("age_profile", selectedAgeProfile)
                                 putString("smtp_host", smtpHost)
                                 putString("smtp_port", smtpPort)

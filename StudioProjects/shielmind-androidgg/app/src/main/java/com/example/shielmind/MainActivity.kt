@@ -37,16 +37,13 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val blockReason by blockReasonState
 
-                    // Retrieve stored emails to determine initial screen
+                    // Retrieve stored emails and PIN to determine initial screen routing
                     val prefs = remember { getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE) }
                     var childEmail by remember { mutableStateOf(prefs.getString("child_email", null)) }
                     var parentEmail by remember { mutableStateOf(prefs.getString("parent_email", null)) }
 
-                    var currentScreen by remember {
-                        mutableStateOf(
-                            if (childEmail.isNullOrBlank() || parentEmail.isNullOrBlank()) "auth" else "setup"
-                        )
-                    }
+                    val hasPin = !prefs.getString("parent_pin", null).isNullOrBlank()
+                    var isUnlocked by remember { mutableStateOf(!hasPin) }
 
                     if (blockReason != null) {
                         EducationalBlockScreen(
@@ -54,20 +51,25 @@ class MainActivity : ComponentActivity() {
                                 Toast.makeText(this@MainActivity, "Demande envoyée au parent", Toast.LENGTH_SHORT).show()
                             },
                             onSafeExit = {
-                                // Minimize app / go to home screen
                                 moveTaskToBack(true)
                             }
                         )
+                    } else if (!isUnlocked && hasPin) {
+                        PinLockScreen(
+                            onCorrectPin = {
+                                isUnlocked = true
+                            }
+                        )
                     } else {
+                        val currentScreen = if (childEmail.isNullOrBlank() || parentEmail.isNullOrBlank()) "auth" else "setup"
                         when (currentScreen) {
                             "auth" -> AuthScreen(onAuthSuccess = { _ ->
                                 // Refresh cached email state
                                 childEmail = prefs.getString("child_email", null)
                                 parentEmail = prefs.getString("parent_email", null)
-                                currentScreen = "setup"
+                                isUnlocked = true
                             })
                             "setup" -> ServiceSetupScreen()
-                            "loading" -> { /* Simple loader */ }
                         }
                     }
                 }
