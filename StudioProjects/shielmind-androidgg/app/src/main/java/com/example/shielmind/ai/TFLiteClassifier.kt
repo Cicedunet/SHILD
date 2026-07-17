@@ -80,4 +80,17 @@ class TFLiteClassifier(context: Context) {
         // Tokenisation par caractère simplifiée
         return text.lowercase().map { it.code }
     }
+
+    /**
+     * Libère les ressources associées à l'interpréteur TFLite.
+     */
+    fun close() {
+        try {
+            interpreter?.close()
+            interpreter = null
+            Log.d("TFLiteClassifier", "Ressources du modèle libérées avec succès.")
+        } catch (e: Exception) {
+            Log.e("TFLiteClassifier", "Erreur lors de la fermeture du modèle : ${e.message}")
+        }
+    }
 }
