@@ -56,19 +56,27 @@ class TFLiteClassifier(context: Context) {
             input[0][i] = if (i < tokens.size) tokens[i] else 0 // Padding avec 0
         }
 
-        // 2. Préparation de la sortie (type INT8 / ByteArray attendu par le modèle quantized)
-        val output = Array(1) { ByteArray(1) }
+        // 2. Préparation de la sortie (type INT8 / ByteArray attendu par le modèle quantized avec shape [1, 8])
+        val output = Array(1) { ByteArray(8) }
 
         try {
             // 3. Exécution de l'inférence
             interpreter?.run(input, output)
-            val byteValue = output[0][0]
-            // Conversion standard d'un byte signé en entier non signé 0..255 puis normalisation entre 0.0 et 1.0
-            val unsignedValue = byteValue.toInt() and 0xFF
-            val score = unsignedValue / 255.0f
-            Log.d("TFLiteClassifier", "Score d'inférence IA pour \"${text.take(20)}...\" : $score (octet brut: $byteValue)")
 
-            return score
+            // Les classes 1 à 7 correspondent aux catégories de toxicité/inapproprié (violence, porn, haine, drogues, etc.)
+            // La classe 0 correspond au contenu sain (clean)
+            val scores = output[0].map { (it.toInt() and 0xFF) / 255.0f }
+
+            var maxToxicScore = 0.0f
+            for (i in 1 until scores.size) {
+                if (scores[i] > maxToxicScore) {
+                    maxToxicScore = scores[i]
+                }
+            }
+
+            Log.d("TFLiteClassifier", "Scores d'inférence IA complets : $scores | Score toxique max : $maxToxicScore pour \"${text.take(20)}...\"")
+
+            return maxToxicScore
         } catch (e: Exception) {
             Log.e("TFLiteClassifier", "Erreur lors de l'inférence : ${e.message}")
             // En cas d'erreur de l'IA, on se base sur une détection par mots-clés simplifiée par sécurité
