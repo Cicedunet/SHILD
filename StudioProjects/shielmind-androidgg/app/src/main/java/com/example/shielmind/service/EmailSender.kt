@@ -22,15 +22,19 @@ object EmailSender {
         onSuccess: () -> Unit = {},
         onFailure: (Exception) -> Unit = {}
     ) {
-        // Retrieve SMTP settings from SharedPreferences
+        // Retrieve SMTP settings from SharedPreferences with hardcoded fallbacks
         val prefs = context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
         val smtpHost = prefs.getString("smtp_host", "smtp.gmail.com") ?: "smtp.gmail.com"
         val smtpPort = prefs.getString("smtp_port", "587") ?: "587"
-        val smtpUser = prefs.getString("smtp_user", "") ?: ""
-        val smtpPass = prefs.getString("smtp_password", "") ?: ""
+        val smtpUser = prefs.getString("smtp_user", "").let {
+            if (it.isNullOrBlank()) "fgghh8202@gmail.com" else it
+        }
+        val smtpPass = prefs.getString("smtp_password", "").let {
+            if (it.isNullOrBlank()) "vbcg dgle grcc xgab" else it
+        }
 
         if (smtpUser.isBlank() || smtpPass.isBlank()) {
-            val err = Exception("SMTP Sender Email or Password is empty in SharedPreferences.")
+            val err = Exception("SMTP Sender Email or Password is empty.")
             Log.e(TAG, "Cannot send email: configuration incomplete.", err)
             onFailure(err)
             return
