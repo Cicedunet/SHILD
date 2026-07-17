@@ -19,16 +19,22 @@ class ShieldAccessibilityService : AccessibilityService() {
             "org.mozilla.firefox",
             "com.microsoft.emmx",
             "com.opera.browser",
+            "com.opera.mini.native",
             "com.sec.android.app.sbrowser",
             "com.duckduckgo.mobile.android",
             "com.brave.browser",
             "com.android.browser",
-            "org.mozilla.focus"
+            "org.mozilla.focus",
+            "com.huawei.browser",
+            "com.yandex.browser",
+            "com.UCMobile.intl",
+            "mark.via.gp"
         )
     }
 
     private val throttler = CaptureThrottler()
     private lateinit var classifier: TFLiteClassifier
+    private var lastBlockTime = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -36,13 +42,20 @@ class ShieldAccessibilityService : AccessibilityService() {
         val packageName = event.packageName?.toString() ?: "inconnu"
 
         // ════════════════════════════════════════════════════════
-        // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS NAVIGATEUR EN DEHORS DE L'APP ON N'ANALYSE RIEN
+        // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS. EN DEHORS DE L'APP ON N'ANALYSE RIEN.
         // ════════════════════════════════════════════════════════
         if (!BROWSER_PACKAGES.contains(packageName)) {
             return
         }
 
-        val rootNode: AccessibilityNodeInfo? = event.source
+        // Évite le déclenchement multiple d'actions de retour en succession rapide
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBlockTime < 2000) {
+            return
+        }
+
+        // Récupération de l'arborescence : source de l'événement ou de la fenêtre active en fallback
+        val rootNode: AccessibilityNodeInfo? = event.source ?: rootInActiveWindow
         if (rootNode == null) return
 
         val rawText = extractAllText(rootNode)
@@ -81,7 +94,10 @@ class ShieldAccessibilityService : AccessibilityService() {
         if (toxicityScore > 0.8f) { // Seuil de blocage
             Log.w(TAG, "CONTENU TOXIQUE DÉTECTÉ ! Blocage en cours...")
 
-            // Ferme uniquement l'onglet/page active du navigateur en effectuant un retour
+            // Enregistre l'heure du blocage pour le cooldown
+            lastBlockTime = System.currentTimeMillis()
+
+            // Ferme uniquement la page active du navigateur en effectuant un retour (action système BACK)
             performGlobalAction(GLOBAL_ACTION_BACK)
 
             // Envoi de l'alerte par mail au parent
