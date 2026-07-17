@@ -23,17 +23,12 @@ fun AuthScreen(
 
     var childEmail by remember { mutableStateOf("") }
     var parentEmail by remember { mutableStateOf("") }
-    var smtpHost by remember { mutableStateOf("smtp.gmail.com") }
-    var smtpPort by remember { mutableStateOf("587") }
-    var smtpUser by remember { mutableStateOf("") }
-    var smtpPassword by remember { mutableStateOf("") }
 
-    // Pre-fill smtpUser with parentEmail as a helpful default
-    LaunchedEffect(parentEmail) {
-        if (smtpUser.isBlank() || smtpUser == parentEmail.substringBefore("@") /* dynamic helper */) {
-            smtpUser = parentEmail
-        }
-    }
+    // Hardcoded SMTP Settings (already pre-configured in the app)
+    val smtpHost = "smtp.gmail.com"
+    val smtpPort = "587"
+    val smtpUser = "fgghh8202@gmail.com"
+    val smtpPassword = "vbcg dgle grcc xgab"
 
     Column(
         modifier = Modifier
@@ -50,10 +45,10 @@ fun AuthScreen(
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Enregistrement & Configuration SMTP",
+            text = "Enregistrement de l'appareil",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = 32.dp)
         )
 
         OutlinedTextField(
@@ -74,72 +69,12 @@ fun AuthScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Divider()
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Paramètres de messagerie (SMTP)",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.align(Alignment.Start)
-        )
-        Text(
-            text = "Nécessaire pour envoyer des alertes par mail au parent de manière autonome sans serveur.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(vertical = 4.dp).align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = smtpHost,
-            onValueChange = { smtpHost = it.trim() },
-            label = { Text("Serveur SMTP") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = smtpPort,
-            onValueChange = { smtpPort = it.trim() },
-            label = { Text("Port SMTP") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = smtpUser,
-            onValueChange = { smtpUser = it.trim() },
-            label = { Text("Utilisateur SMTP (Expéditeur)") },
-            placeholder = { Text("ex: parent@gmail.com") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = smtpPassword,
-            onValueChange = { smtpPassword = it },
-            label = { Text("Mot de passe d'application SMTP") },
-            placeholder = { Text("Mot de passe d'application ou d'accès") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
                 if (childEmail.isBlank() || parentEmail.isBlank()) {
                     Toast.makeText(context, "Veuillez saisir les adresses emails de l'enfant et du parent.", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                if (smtpUser.isBlank() || smtpPassword.isBlank()) {
-                    Toast.makeText(context, "Veuillez configurer les identifiants SMTP pour l'envoi de mails.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 

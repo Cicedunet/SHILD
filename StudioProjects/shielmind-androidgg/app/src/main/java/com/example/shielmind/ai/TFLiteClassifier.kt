@@ -56,14 +56,17 @@ class TFLiteClassifier(context: Context) {
             input[0][i] = if (i < tokens.size) tokens[i] else 0 // Padding avec 0
         }
 
-        // 2. Préparation de la sortie (Probabilité FLOAT32 entre 0 et 1)
-        val output = Array(1) { FloatArray(1) }
+        // 2. Préparation de la sortie (type INT8 / ByteArray attendu par le modèle quantized)
+        val output = Array(1) { ByteArray(1) }
 
         try {
             // 3. Exécution de l'inférence
             interpreter?.run(input, output)
-            val score = output[0][0]
-            Log.d("TFLiteClassifier", "Score d'inférence IA pour \"${text.take(20)}...\" : $score")
+            val byteValue = output[0][0]
+            // Conversion standard d'un byte signé en entier non signé 0..255 puis normalisation entre 0.0 et 1.0
+            val unsignedValue = byteValue.toInt() and 0xFF
+            val score = unsignedValue / 255.0f
+            Log.d("TFLiteClassifier", "Score d'inférence IA pour \"${text.take(20)}...\" : $score (octet brut: $byteValue)")
 
             return score
         } catch (e: Exception) {
