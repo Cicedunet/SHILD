@@ -7,6 +7,9 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.shielmind.ai.TFLiteClassifier
 import com.example.shielmind.service.EmailSender
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ShieldAccessibilityService : AccessibilityService() {
 
@@ -38,7 +41,6 @@ class ShieldAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Libération de la mémoire du modèle IA pour éviter de faire ramer le téléphone
         if (::classifier.isInitialized) {
             classifier.close()
         }
@@ -50,7 +52,7 @@ class ShieldAccessibilityService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: "inconnu"
 
-        // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS (EN DEHORS DE L'APP ON N'ANALYSE RIEN)
+        // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS
         if (!BROWSER_PACKAGES.contains(packageName)) {
             return
         }
@@ -82,18 +84,46 @@ class ShieldAccessibilityService : AccessibilityService() {
 
         Log.d(TAG, "Score de toxicité final : $toxicityScore")
 
-        if (toxicityScore > 0.8f) { // Seuil de blocage
-            Log.w(TAG, "CONTENU TOXIQUE DÉTECTÉ ! Blocage en cours... (Score: $toxicityScore)")
+        // Récupération de l'âge de l'enfant pour adapter le seuil de sensibilité
+        val prefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+        val ageProfile = prefs.getString("age_profile", "enfant") ?: "enfant"
+
+        // Seuil dynamique de blocage selon le profil d'âge
+        val threshold = when (ageProfile) {
+            "adulte" -> 0.85f       // Adulte : Moins strict, bloque seulement la forte toxicité
+            "ado" -> 0.60f          // Adolescent : Équilibré
+            else -> 0.35f           // Enfant : Très strict, bloque au moindre doute
+        }
+
+        if (toxicityScore > threshold) {
+            Log.w(TAG, "CONTENU TOXIQUE DÉTECTÉ ($ageProfile) ! Blocage en cours... (Score: $toxicityScore, Seuil: $threshold)")
 
             // Ferme uniquement l'onglet/page active du navigateur en effectuant un retour
             performGlobalAction(GLOBAL_ACTION_BACK)
 
+            // Enregistrer l'événement de blocage dans l'historique local pour l'afficher sur le tableau de bord
+            saveBlockEventToHistory(content, toxicityScore)
+
             // Envoi de l'alerte par mail au parent
-            sendAlertToParentByEmail(content)
+            sendAlertToParentByEmail(content, ageProfile, toxicityScore)
         }
     }
 
-    private fun sendAlertToParentByEmail(content: CapturedContent) {
+    private fun saveBlockEventToHistory(content: CapturedContent, score: Float) {
+        val prefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+        val historySet = prefs.getStringSet("block_history", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+
+        val timestamp = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+        val appName = content.sourceApp.substringAfterLast(".")
+        val textSnippet = content.text.take(100).replace("|", " ").replace("\n", " ")
+
+        val eventString = "$timestamp|$appName|$textSnippet|${String.format(Locale.US, "%.2f", score)}"
+
+        historySet.add(eventString)
+        prefs.edit().putStringSet("block_history", historySet).apply()
+    }
+
+    private fun sendAlertToParentByEmail(content: CapturedContent, ageProfile: String, score: Float) {
         val prefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
         val childEmail = prefs.getString("child_email", "") ?: ""
         val parentEmail = prefs.getString("parent_email", "") ?: ""
@@ -110,6 +140,8 @@ class ShieldAccessibilityService : AccessibilityService() {
             Une alerte de contenu inapproprié a été détectée et bloquée sur l'appareil de votre enfant ($childEmail).
 
             Détails de l'alerte :
+            - Profil d'âge : $ageProfile
+            - Score de toxicité : ${String.format(Locale.US, "%.2f", score)}
             - Application : ${content.sourceApp}
             - Texte détecté :
             ${content.text}
