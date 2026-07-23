@@ -47,11 +47,15 @@ class MainActivity : ComponentActivity() {
 
                     if (blockReason != null) {
                         EducationalBlockScreen(
+                            reason = blockReason,
                             onUnblockRequest = {
                                 Toast.makeText(this@MainActivity, "Demande envoyée au parent", Toast.LENGTH_SHORT).show()
                             },
                             onSafeExit = {
                                 moveTaskToBack(true)
+                            },
+                            onParentOverrideSuccess = {
+                                blockReasonState.value = null
                             }
                         )
                     } else if (!isUnlocked && hasPin) {
