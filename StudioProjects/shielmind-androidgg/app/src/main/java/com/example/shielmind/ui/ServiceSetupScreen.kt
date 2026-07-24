@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.shielmind.accessibility.AccessibilityHelper
 import com.example.shielmind.admin.DeviceAdminHelper
+import com.example.shielmind.service.LocationHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +47,7 @@ fun ServiceSetupScreen() {
     val context = LocalContext.current
     var isAccessibilityEnabled by remember { mutableStateOf(AccessibilityHelper.isAccessibilityServiceEnabled(context)) }
     var isDeviceAdmin by remember { mutableStateOf(DeviceAdminHelper.isDeviceAdmin(context)) }
-    var selectedTab by remember { mutableStateOf(0) } // 0: Protection, 1: Historique
+    var selectedTab by remember { mutableStateOf(0) } // 0: Protection, 1: Contrôle & Géo, 2: Historique
 
     val deviceAdminLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -97,7 +99,7 @@ fun ServiceSetupScreen() {
                 .padding(padding)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Customized Tab Row with clean glassmorphism style
+                // Customized Tab Row with clean glassmorphism style (3 Tabs)
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = Color(0xFF141423),
@@ -112,14 +114,20 @@ fun ServiceSetupScreen() {
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Protection Active", fontWeight = FontWeight.Bold) },
-                        icon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                        text = { Text("Protection", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                        icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Historique IA", fontWeight = FontWeight.Bold) },
-                        icon = { Icon(Icons.Default.List, contentDescription = null) }
+                        text = { Text("Contrôle & Géo", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                        icon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(20.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text("Historique IA", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                        icon = { Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(20.dp)) }
                     )
                 }
 
@@ -138,7 +146,8 @@ fun ServiceSetupScreen() {
                             },
                             deviceAdminLauncher = deviceAdminLauncher
                         )
-                        1 -> HistoryTab(context = context)
+                        1 -> ControlTab(context = context)
+                        2 -> HistoryTab(context = context)
                     }
                 }
             }
@@ -163,6 +172,7 @@ fun ProtectionTab(
     var showPinChangeDialog by remember { mutableStateOf(false) }
     var newPin by remember { mutableStateOf("") }
     var currentStoredPin by remember { mutableStateOf(prefs.getString("parent_pin", "0000") ?: "0000") }
+    var isPinVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -312,12 +322,26 @@ fun ProtectionTab(
                         fontSize = 14.sp,
                         color = Color.White
                     )
-                    Text(
-                        text = "Code PIN actuel : $currentStoredPin",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 2.dp)
-                    )
+                    ) {
+                        Text(
+                            text = "Code PIN : " + if (isPinVisible) currentStoredPin else "••••",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isPinVisible) "Masquer" else "Afficher",
+                            fontSize = 11.sp,
+                            color = Color(0xFF64B5F6),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { isPinVisible = !isPinVisible }
+                                .padding(horizontal = 4.dp)
+                        )
+                    }
                 }
                 Button(
                     onClick = { showPinChangeDialog = true },
@@ -378,16 +402,24 @@ fun ProtectionTab(
         if (showPinChangeDialog) {
             AlertDialog(
                 onDismissRequest = { showPinChangeDialog = false },
-                title = { Text("Modifier le code PIN", fontWeight = FontWeight.Bold) },
+                title = { Text("Modifier le code PIN", fontWeight = FontWeight.Bold, color = Color.White) },
+                containerColor = Color(0xFF1E1E2F),
                 text = {
                     Column {
-                        Text("Saisissez un nouveau code PIN parental à 4 chiffres :")
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Saisissez un nouveau code PIN parental à 4 chiffres :", color = Color.LightGray)
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = newPin,
                             onValueChange = { if (it.length <= 4) newPin = it.filter { char -> char.isDigit() } },
-                            placeholder = { Text("ex: 1234") },
+                            placeholder = { Text("ex: 1234", color = Color.Gray) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF64B5F6),
+                                unfocusedBorderColor = Color.Gray,
+                                cursorColor = Color(0xFF64B5F6)
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -404,17 +436,365 @@ fun ProtectionTab(
                             } else {
                                 Toast.makeText(context, "Le code PIN doit comporter exactement 4 chiffres.", Toast.LENGTH_SHORT).show()
                             }
-                        }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
                     ) {
-                        Text("Enregistrer")
+                        Text("Enregistrer", color = Color.White)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showPinChangeDialog = false }) {
-                        Text("Annuler")
+                        Text("Annuler", color = Color.LightGray)
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+fun ControlTab(context: Context) {
+    val prefs = remember { context.getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE) }
+    val scrollState = rememberScrollState()
+
+    // 1. Screen Time limit states
+    var limitMinutes by remember { mutableStateOf(prefs.getInt("screen_time_limit_minutes", 30)) }
+    var usedSeconds by remember { mutableStateOf(prefs.getInt("screen_time_used_seconds", 0)) }
+
+    // Periodically refresh the actual elapsed time on the dashboard while this tab is open
+    LaunchedEffect(Unit) {
+        while (true) {
+            usedSeconds = prefs.getInt("screen_time_used_seconds", 0)
+            limitMinutes = prefs.getInt("screen_time_limit_minutes", 30)
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    val usedMinutes = usedSeconds / 60
+    val totalLimitSeconds = limitMinutes * 60
+    val progressFraction = if (totalLimitSeconds > 0) usedSeconds.toFloat() / totalLimitSeconds.toFloat() else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressFraction.coerceIn(0f, 1f),
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "progress"
+    )
+
+    // Interpolated Color for progress: Green to Yellow to Red
+    val progressColor = when {
+        progressFraction <= 0.5f -> Color(0xFF81C784)
+        progressFraction <= 0.8f -> Color(0xFFFFB74D)
+        else -> Color(0xFFE57373)
+    }
+
+    // 2. Geolocation states
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var currentLocation by remember { mutableStateOf<android.location.Location?>(LocationHelper.getCurrentLocation(context)) }
+    var isRefreshingLocation by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasLocationPermission = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocationPermission) {
+            currentLocation = LocationHelper.getCurrentLocation(context)
+        }
+    }
+
+    // Rotation animation for Geolocation refresh button
+    val rotation = remember { Animatable(0f) }
+    LaunchedEffect(isRefreshingLocation) {
+        if (isRefreshingLocation) {
+            rotation.animateTo(
+                targetValue = rotation.value + 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        } else {
+            rotation.animateTo(0f, tween(300))
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // --- SCREEN TIME MANAGEMENT SECTION ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow, // clock representation
+                        contentDescription = null,
+                        tint = Color(0xFF64B5F6),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Limite de Temps d'Écran",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Beautiful Circular Progress Dashboard
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(130.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = animatedProgress,
+                        modifier = Modifier.size(120.dp),
+                        color = progressColor,
+                        strokeWidth = 8.dp,
+                        trackColor = Color.White.copy(alpha = 0.08f)
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "$usedMinutes m",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "sur $limitMinutes min",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Ajuster la limite de temps quotidienne",
+                    fontSize = 13.sp,
+                    color = Color.LightGray.copy(alpha = 0.8f)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("5 min", fontSize = 11.sp, color = Color.Gray)
+                    Slider(
+                        value = limitMinutes.toFloat(),
+                        onValueChange = {
+                            limitMinutes = it.toInt()
+                            prefs.edit().putInt("screen_time_limit_minutes", limitMinutes).apply()
+                        },
+                        valueRange = 5f..180f,
+                        steps = 34,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF1E88E5),
+                            activeTrackColor = Color(0xFF1E88E5),
+                            inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                        ),
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    )
+                    Text("180 min", fontSize = 11.sp, color = Color.Gray)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Reset option
+                TextButton(
+                    onClick = {
+                        prefs.edit().putInt("screen_time_used_seconds", 0).apply()
+                        usedSeconds = 0
+                        Toast.makeText(context, "Compteur de temps réinitialisé !", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF64B5F6))
+                ) {
+                    Text("Réinitialiser le compteur du jour", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- GEOLOCATION REAL FEATURE ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            tint = Color(0xFF81C784),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Géo-localisation Temps Réel",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
+                    }
+
+                    if (hasLocationPermission) {
+                        IconButton(
+                            onClick = {
+                                isRefreshingLocation = true
+                                LocationHelper.requestFreshLocationUpdate(context) { location ->
+                                    currentLocation = location
+                                    isRefreshingLocation = false
+                                    Toast.makeText(context, "Position mise à jour !", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.rotate(rotation.value)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Rafraîchir", tint = Color(0xFF81C784))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (!hasLocationPermission) {
+                    Text(
+                        text = "L'accès à la position GPS de l'appareil de l'enfant est requis pour afficher sa position en temps réel sur la carte parent.",
+                        fontSize = 12.sp,
+                        color = Color.LightGray.copy(alpha = 0.8f),
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF81C784))
+                    ) {
+                        Text("Accorder l'accès position GPS", fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                } else {
+                    val location = currentLocation
+                    if (location != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Latitude", fontSize = 12.sp, color = Color.Gray)
+                                Text(
+                                    String.format(java.util.Locale.US, "%.6f", location.latitude),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Longitude", fontSize = 12.sp, color = Color.Gray)
+                                Text(
+                                    String.format(java.util.Locale.US, "%.6f", location.longitude),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Précision", fontSize = 12.sp, color = Color.Gray)
+                                Text(
+                                    "${location.accuracy.toInt()} mètres",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF81C784),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}")
+                                )
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                        ) {
+                            Text("Afficher l'enfant sur Google Maps", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF81C784), modifier = Modifier.size(28.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                "Recherche du signal GPS réel...",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

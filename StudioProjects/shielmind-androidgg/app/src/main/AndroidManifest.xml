@@ -11,6 +11,10 @@
     <!-- Permission pour démarrer au boot de l'appareil -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Permissions pour la géo-localisation réelle -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:name=".ShieldMindApplication"
         android:allowBackup="true"

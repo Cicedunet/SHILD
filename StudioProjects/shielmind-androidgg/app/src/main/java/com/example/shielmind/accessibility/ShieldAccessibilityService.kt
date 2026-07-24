@@ -33,24 +33,94 @@ class ShieldAccessibilityService : AccessibilityService() {
     private val throttler = CaptureThrottler()
     private lateinit var classifier: TFLiteClassifier
 
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var screenTimeRunnable: Runnable? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "ShieldMind Accessibility Service démarré avec succès")
         classifier = TFLiteClassifier(this)
+
+        // Start screen time background tracker
+        screenTimeRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    checkAndUpdateScreenTime()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking screen time: ${e.message}")
+                }
+                handler.postDelayed(this, 1000)
+            }
+        }
+        handler.post(screenTimeRunnable!!)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        screenTimeRunnable?.let { handler.removeCallbacks(it) }
         if (::classifier.isInitialized) {
             classifier.close()
         }
         Log.d(TAG, "Service ShieldMind arrêté proprement")
     }
 
+    private fun checkAndUpdateScreenTime() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val isInteractive = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT_WATCH) {
+            powerManager.isInteractive
+        } else {
+            @Suppress("DEPRECATION")
+            powerManager.isScreenOn
+        }
+
+        if (!isInteractive) return
+
+        val prefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val savedDate = prefs.getString("screen_time_today_date", "") ?: ""
+
+        var usedSeconds = prefs.getInt("screen_time_used_seconds", 0)
+
+        if (today != savedDate) {
+            usedSeconds = 0
+            prefs.edit()
+                .putString("screen_time_today_date", today)
+                .putInt("screen_time_used_seconds", 0)
+                .apply()
+        } else {
+            usedSeconds += 1
+            prefs.edit().putInt("screen_time_used_seconds", usedSeconds).apply()
+        }
+
+        val limitMinutes = prefs.getInt("screen_time_limit_minutes", 30) // default 30 mins
+        if (usedSeconds >= limitMinutes * 60) {
+            val intent = android.content.Intent(this, com.example.shielmind.MainActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra("BLOCK_REASON", "TEMPS_EPUISE")
+            }
+            startActivity(intent)
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
         val packageName = event.packageName?.toString() ?: "inconnu"
+
+        // Enforce Screen Time limit if exceeded, but allow interaction with our app (com.example.shielmind)
+        val timePrefs = getSharedPreferences("shieldmind_prefs", Context.MODE_PRIVATE)
+        val usedSeconds = timePrefs.getInt("screen_time_used_seconds", 0)
+        val limitMinutes = timePrefs.getInt("screen_time_limit_minutes", 30)
+        if (usedSeconds >= limitMinutes * 60) {
+            if (packageName != "com.example.shielmind") {
+                val intent = android.content.Intent(this, com.example.shielmind.MainActivity::class.java).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("BLOCK_REASON", "TEMPS_EPUISE")
+                }
+                startActivity(intent)
+                return
+            }
+        }
 
         // ANALYSE UNIQUEMENT DANS LES NAVIGATEURS
         if (!BROWSER_PACKAGES.contains(packageName)) {
